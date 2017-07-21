@@ -1,0 +1,132 @@
+Node Test
+
+user-api-spec.js
+```
+var expect = require("chai").expect
+var tools = require("../lib/tools")
+
+describe("Tools", function () {
+
+    describe('printName(', function () {
+        it('should print the last name first', function () {
+            var results = tools.printName({ first: "Alex", last: "Banks" });
+            expect(results).to.equal("Banks,Alex");
+        });
+    });
+    
+    describe("LoadBaidu()", function () {
+        it("Load Abraham Lincoln's wikipedia page", function (done) {
+            tools.loadBaidu({ first: "Abraham", last: "Lincon" }, function (html) {
+                expect(html).to.be.ok;
+                done();
+            });
+        });
+    })
+
+});
+```
+tools.js
+```
+var https = require("https")
+
+module.exports = {
+
+    printName(person) {
+        return `${person.last},${person.first}`;
+    },
+    
+    loadWiki(person,callback) {
+        var url = `https://en.wikipedia.org/wiki/${person.first}_${person.last}`
+
+        https.get(url, function (res) {
+            var body = "";
+
+            res.setEncoding("UTF-8");
+
+            res.on("data", function (chunk) {
+                body += chunk;
+            });
+
+            res.on("end", function () {
+                callback(body);
+            });
+
+        });
+    }
+```
+**注意**异步测试时，Mocha提供了一个回调函数done，在业务代码执行完毕之后调用done()结束测试用例，不然的话测试用例就会出现timeout的情况导致测试用例失败。Mocha默认的超时时间是2000毫秒，如果由于测试用例的执行时间比较长需要延长超时时间，可以在命令行添加 -t 参数，比如mocha -t 3000 add.test.js。当然还有其他命令行参数，比如 mocha -w 用来监视指定的测试脚本。只要测试脚本有变化，就会自动运行Mocha
+
+---
+**mock http请求**
+使用`nock`
+user-api-spec.js
+```
+var expect = require("chai").expect
+var tools = require("../lib/tools")
+var nock = require("nock");
+
+describe("Tools", function () {
+
+    describe('printName(', function () {
+        it('should print the last name first', function () {
+            var results = tools.printName({ first: "Alex", last: "Banks" });
+            expect(results).to.equal("Banks,Alex");
+        });
+    });
+    
+    describe("LoadWiki()", function () {
+
+        before(function () {
+            nock("https://en.wikipedia.org")
+                .get("/wiki/Abraham_Lincon")
+                .reply(200, "fake html page return");
+        })
+
+        it("Load Abraham Lincoln's wikipedia page", function (done) {
+            tools.loadWiki({ first: "Abraham", last: "Lincon" }, function (html) {
+                expect(html).to.equal("fake html page return");
+                done();
+            });
+        });
+    })
+
+});
+```
+
+---
+**mock module的依赖**
+使用`rewire`
+```
+var expect = require("chai").expect;
+var rewire = require("rewire");
+
+var order = rewire("../lib/order");
+
+describe("Ordering Items", function() {
+
+    beforeEach( function() {
+
+        this.testData = [
+            { sku: "AAA", qty: 10 },
+            { sku: "BBB", qty: 0 },
+            { sku: "CCC", qty: 3 }
+        ];
+
+        order.__set__("inventory", this.testData);
+    }); 
+
+    it("order an item when there are enough in stock", function (done) {
+        order.orderItem("CCC", 3, function () {
+            done();
+        })
+    });
+});
+```
+order.js
+```
+var inventoryData = require('../data/inventory');
+function order(sku, quantity, complete) {
+}
+
+module.exports.orderItem = order;
+```
